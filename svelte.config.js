@@ -8,7 +8,11 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      // fallback: 'index.html'을 설정해주는 것이 좋습니다.
+      // Tauri에서 새로고침 시에도 페이지를 제대로 찾게 해줍니다.
+      fallback: 'index.html'
+    }),
   },
 };
 
