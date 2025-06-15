@@ -1,5 +1,6 @@
 <!-- src/routes/+layout.svelte -->
 <script>
+  import Statusbar from "$lib/components/Statusbar.svelte";
   import Titlebar from "$lib/components/Titlebar.svelte";
   // Svelte 5 방식: { children } 프롭을 통해 페이지 콘텐츠를 받습니다.
   let { children } = $props();
@@ -14,7 +15,9 @@
     {@render children()}
   </main>
 
-  <footer class="statusbar-container"></footer>
+  <footer class="statusbar-container">
+    <Statusbar />
+  </footer>
 </div>
 
 <style>
