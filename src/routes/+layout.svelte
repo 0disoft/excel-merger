@@ -1,19 +1,20 @@
 <!-- src/routes/+layout.svelte -->
 <script>
+  import Titlebar from "$lib/components/Titlebar.svelte";
   // Svelte 5 방식: { children } 프롭을 통해 페이지 콘텐츠를 받습니다.
   let { children } = $props();
 </script>
 
 <div class="app-container">
   <header class="titlebar-container">
-    </header>
+    <Titlebar />
+  </header>
 
   <main class="main-content">
     {@render children()}
   </main>
 
-  <footer class="statusbar-container">
-    </footer>
+  <footer class="statusbar-container"></footer>
 </div>
 
 <style>
@@ -25,6 +26,7 @@
   }
 
   .app-container {
+    padding-top: 30px; /* 타이틀바 높이 */
     display: flex;
     flex-direction: column;
     height: 100vh; /* 화면 전체 높이 */
