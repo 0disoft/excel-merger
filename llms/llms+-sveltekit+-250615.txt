@@ -1,0 +1,1197 @@
+TITLE: Loading Single Blog Post Data in SvelteKit Page Server Load
+DESCRIPTION: This SvelteKit `PageServerLoad` function fetches a single blog post from a database based on the `slug` parameter from the URL. It demonstrates how `params.slug` is tracked as a dependency, causing the `load` function to rerun when the slug changes during navigation.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_26
+
+LANGUAGE: JavaScript
+CODE:
+```
+// @filename: ambient.d.ts
+declare module '$lib/server/database' {
+	export function getPost(slug: string): Promise<{ title: string, content: string }>
+}
+
+// @filename: index.js
+// ---cut---
+import * as db from '$lib/server/database';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ params }) {
+	return {
+		post: await db.getPost(params.slug)
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Using requireLogin in a SvelteKit Server Load Function
+DESCRIPTION: This JavaScript snippet demonstrates how to integrate the `requireLogin` function (defined in `src/lib/server/auth.js`) into a SvelteKit `+page.server.js` `load` function. By calling `requireLogin()`, it ensures that the user is authenticated before proceeding, as `requireLogin` will redirect if the user is not logged in. If authentication succeeds, it returns a message including the user's name.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_32
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: +page.server.js
+// @filename: ambient.d.ts
+
+declare module '$lib/server/auth' {
+	interface User {
+		name: string;
+	}
+
+	export function requireLogin(): User;
+}
+
+// @filename: index.ts
+// ---cut---
+import { requireLogin } from '$lib/server/auth';
+
+export function load() {
+	const user = requireLogin();
+
+	// `user` is guaranteed to be a user object here, because otherwise
+	// `requireLogin` would throw a redirect and we wouldn't get here
+	return {
+		message: `hello ${user.name}!`
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Setting Page Title for Route Announcements in SvelteKit
+DESCRIPTION: This Svelte code snippet demonstrates how to set a unique and descriptive page title using the <svelte:head> element within a SvelteKit page. This is crucial for screen readers to announce the new page name after client-side navigation, improving accessibility. It also contributes positively to SEO.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/40-best-practices/10-accessibility.md#_snippet_0
+
+LANGUAGE: svelte
+CODE:
+```
+<!--- file: src/routes/+page.svelte --->
+<svelte:head>
+	<title>Todo List</title>
+</svelte:head>
+```
+
+----------------------------------------
+
+TITLE: Implementing Shared Authentication with getRequestEvent in SvelteKit
+DESCRIPTION: This JavaScript snippet defines a `requireLogin` function that leverages SvelteKit's `getRequestEvent` to access the current request's `locals` and `url`. It checks if a user is logged in (assuming `locals.user` is populated by a SvelteKit `handle` hook) and redirects to `/login` if not, preserving the original URL as a `redirectTo` parameter. Otherwise, it returns the authenticated user object.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_31
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: src/lib/server/auth.js
+// @filename: ambient.d.ts
+interface User {
+	name: string;
+}
+
+declare namespace App {
+	interface Locals {
+		user?: User;
+	}
+}
+
+// @filename: index.ts
+// ---cut---
+import { redirect } from '@sveltejs/kit';
+import { getRequestEvent } from '$app/server';
+
+export function requireLogin() {
+	const { locals, url } = getRequestEvent();
+
+	// assume `locals.user` is populated in `handle`
+	if (!locals.user) {
+		const redirectTo = url.pathname + url.search;
+		const params = new URLSearchParams({ redirectTo });
+
+		redirect(307, `/login?${params}`);
+	}
+
+	return locals.user;
+}
+```
+
+----------------------------------------
+
+TITLE: Creating a SvelteKit Project with npx sv (Bash)
+DESCRIPTION: This snippet demonstrates the quick start process for initializing a new SvelteKit application using the `npx sv` command. It covers creating the project directory, navigating into it, installing necessary dependencies, and starting the development server to begin building the application.
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/kit/README.md#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+npx sv create my-app
+cd my-app
+npm install
+npm run dev
+```
+
+----------------------------------------
+
+TITLE: Populating event.locals in SvelteKit handle hook
+DESCRIPTION: This snippet demonstrates how to populate the `event.locals` object within the SvelteKit `handle` hook. It includes a TypeScript type definition for `App.Locals` to ensure type safety for `event.locals.user` and then shows the JavaScript implementation of the `handle` function, fetching user data and assigning it. It also illustrates modifying response headers, with a cautionary note about immutable headers.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/20-hooks.md#_snippet_1
+
+LANGUAGE: TypeScript
+CODE:
+```
+/// file: src/hooks.server.js
+// @filename: ambient.d.ts
+type User = {
+	name: string;
+}
+
+declare namespace App {
+	interface Locals {
+		user: User;
+	}
+}
+```
+
+LANGUAGE: JavaScript
+CODE:
+```
+const getUserInformation: (cookie: string | void) => Promise<User>;
+
+// @filename: index.js
+// ---cut---
+/** @type {import('@sveltejs/kit').Handle} */
+export async function handle({ event, resolve }) {
+	event.locals.user = await getUserInformation(event.cookies.get('sessionid'));
+
+	const response = await resolve(event);
+
+	// Note that modifying response headers isn't always safe.
+	// Response objects can have immutable headers
+	// (e.g. Response.redirect() returned from an endpoint).
+	// Modifying immutable headers throws a TypeError.
+	// In that case, clone the response or avoid creating a
+	// response object with immutable headers.
+	response.headers.set('x-custom-header', 'potato');
+
+	return response;
+}
+```
+
+----------------------------------------
+
+TITLE: Server-Side Data Loading with +page.server.js in SvelteKit
+DESCRIPTION: Explains how to use `+page.server.js` for `load` functions that require server-only access, such as database interactions or private environment variables. Data is fetched from the server during client-side navigation and must be serializable using devalue.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_3
+
+LANGUAGE: javascript
+CODE:
+```
+/// file: src/routes/blog/[slug]/+page.server.js
+
+// @filename: ambient.d.ts
+declare global {
+	const getPostFromDatabase: (slug: string) => {
+		title: string;
+		content: string;
+	}
+}
+
+export {};
+
+// @filename: index.js
+// ---cut---
+import { error } from '@sveltejs/kit';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ params }) {
+	const post = await getPostFromDatabase(params.slug);
+
+	if (post) {
+		return post;
+	}
+
+	error(404, 'Not found');
+}
+```
+
+----------------------------------------
+
+TITLE: Defining Server-Only Secret Data in SvelteKit
+DESCRIPTION: This snippet demonstrates how to define server-only data within a SvelteKit application by placing it in a `$lib/server` directory. This ensures that sensitive information, like `atlantisCoordinates`, is never exposed to the client-side.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/50-server-only-modules.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+export const atlantisCoordinates = [/* redacted */];
+```
+
+----------------------------------------
+
+TITLE: Initializing a SvelteKit Project with npx
+DESCRIPTION: This snippet demonstrates the initial steps to scaffold, navigate into, install dependencies for, and start a new SvelteKit application using `npx sv create`. It sets up a basic project structure and launches the development server, making the application accessible locally.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/10-getting-started/20-creating-a-project.md#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+npx sv create my-app
+cd my-app
+npm install
+npm run dev
+```
+
+----------------------------------------
+
+TITLE: Handling Server Requests with SvelteKit `handle` Hook (JavaScript)
+DESCRIPTION: This `handle` function in `src/hooks.server.js` intercepts every SvelteKit server request, including during prerendering. It receives an `event` object and a `resolve` function to render the route. The example demonstrates returning a custom response for specific paths or otherwise resolving the event to generate the standard SvelteKit response. It's crucial for modifying response headers/bodies or bypassing SvelteKit's default routing.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/20-hooks.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+/** @type {import('@sveltejs/kit').Handle} */
+export async function handle({ event, resolve }) {
+	if (event.url.pathname.startsWith('/custom')) {
+		return new Response('custom response');
+	}
+
+	const response = await resolve(event);
+	return response;
+}
+```
+
+----------------------------------------
+
+TITLE: Loading Data Universally with +page.js in SvelteKit
+DESCRIPTION: Shows how to use a `+page.js` module to export a `load` function for fetching data required by a page. This function runs on both the server during SSR and in the browser during client-side navigation, handling dynamic content and error states.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_2
+
+LANGUAGE: javascript
+CODE:
+```
+/// file: src/routes/blog/[slug]/+page.js
+import { error } from '@sveltejs/kit';
+
+/** @type {import('./$types').PageLoad} */
+export function load({ params }) {
+	if (params.slug === 'hello-world') {
+		return {
+			title: 'Hello world!',
+			content: 'Welcome to our blog. Lorem ipsum dolor sit amet...'
+		};
+	}
+
+	error(404, 'Not found');
+}
+```
+
+----------------------------------------
+
+TITLE: Importing Image Assets with Vite in Svelte
+DESCRIPTION: Demonstrates how Vite automatically processes imported image assets for improved performance. This example shows importing a local image and using it as the `src` for an `<img>` tag in a Svelte component, leveraging Vite's asset handling for caching and inlining.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/40-best-practices/07-images.md#_snippet_0
+
+LANGUAGE: svelte
+CODE:
+```
+<script>
+	import logo from '$lib/assets/logo.png';
+</script>
+
+<img alt="The project logo" src={logo} />
+```
+
+----------------------------------------
+
+TITLE: Creating New SvelteKit Project with Lucia Auth
+DESCRIPTION: This command initializes a new SvelteKit project and integrates Lucia for session-based authentication. It's used when starting a new project from scratch, streamlining the setup process for authentication.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/40-best-practices/03-auth.md#_snippet_0
+
+LANGUAGE: Shell
+CODE:
+```
+npx sv create
+```
+
+----------------------------------------
+
+TITLE: Checking Browser Environment in SvelteKit
+DESCRIPTION: Demonstrates how to conditionally execute code only on the client-side by checking the `browser` variable from `$app/environment`. This is useful for code that relies on `document` or `window` objects, ensuring it doesn't run during server-side rendering.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/60-appendix/10-faq.md#_snippet_2
+
+LANGUAGE: JavaScript
+CODE:
+```
+import { browser } from '$app/environment';
+
+if (browser) {
+	// client-only code here
+}
+```
+
+----------------------------------------
+
+TITLE: SvelteKit API Route POST Handler for JSON Data
+DESCRIPTION: This JavaScript snippet illustrates how to create a `POST` handler in a `+server.js` file to receive and process JSON data from a client. It parses the request body, performs an addition operation, and returns the result as JSON using SvelteKit's `json` utility.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_13
+
+LANGUAGE: javascript
+CODE:
+```
+/// file: src/routes/api/add/+server.js
+import { json } from '@sveltejs/kit';
+
+/** @type {import('./$types').RequestHandler} */
+export async function POST({ request }) {
+	const { a, b } = await request.json();
+	return json(a + b);
+}
+```
+
+----------------------------------------
+
+TITLE: Triggering SvelteKit Load Function Reruns from Svelte Component
+DESCRIPTION: This Svelte component demonstrates how to manually trigger a rerun of the associated `load` function using `invalidate` and `invalidateAll` from `$app/navigation`. It provides a button that, when clicked, will force the `load` function to re-fetch data, updating the displayed random number.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_30
+
+LANGUAGE: Svelte
+CODE:
+```
+<script>
+	import { invalidate, invalidateAll } from '$app/navigation';
+
+	/** @type {import('./$types').PageProps} */
+	let { data } = $props();
+
+	function rerunLoadFunction() {
+		// any of these will cause the `load` function to rerun
+		invalidate('app:random');
+		invalidate('https://api.example.com/random-number');
+		invalidate(url => url.href.includes('random-number'));
+		invalidateAll();
+	}
+</script>
+
+<p>random number: {data.number}</p>
+<button onclick={rerunLoadFunction}>Update random number</button>
+```
+
+----------------------------------------
+
+TITLE: Consuming Page Data in Svelte `+page.svelte`
+DESCRIPTION: This Svelte component demonstrates how to consume data loaded by a `+page.js` file. It uses `$props()` to destructure the `data` prop, which contains the `post` object, and then renders its title and content within the HTML structure.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_1
+
+LANGUAGE: Svelte
+CODE:
+```
+<--- file: src/routes/blog/[slug]/+page.svelte --->
+<script>
+	/** @type {import('./$types').PageProps} */
+	let { data } = $props();
+</script>
+
+<h1>{data.post.title}</h1>
+<div>{@html data.post.content}</div>
+```
+
+----------------------------------------
+
+TITLE: Accessing Loaded Data in SvelteKit Pages
+DESCRIPTION: Demonstrates how a `+page.svelte` component receives data from `load` functions via the `data` prop. This enables dynamic content rendering based on information fetched by associated `+page.js` or `+page.server.js` files.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_1
+
+LANGUAGE: svelte
+CODE:
+```
+<script>
+	/** @type {import('./$types').PageProps} */
+	let { data } = $props();
+</script>
+
+<h1>{data.title}</h1>
+<div>{@html data.content}</div>
+```
+
+----------------------------------------
+
+TITLE: Configuring SvelteKit Adapter in svelte.config.js
+DESCRIPTION: This snippet demonstrates how to specify and configure a SvelteKit adapter within the `svelte.config.js` file. It shows importing an adapter from a package (e.g., 'svelte-adapter-foo') and assigning it to the `kit.adapter` property within the SvelteKit configuration object, allowing for adapter-specific options to be passed as an argument to the adapter function.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/25-build-and-deploy/20-adapters.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: svelte.config.js
+// @filename: ambient.d.ts
+declare module 'svelte-adapter-foo' {
+	const adapter: (opts: any) => import('@sveltejs/kit').Adapter;
+	export default adapter;
+}
+
+// @filename: index.js
+// ---cut---
+import adapter from 'svelte-adapter-foo';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	kit: {
+		adapter: adapter({
+			// adapter options go here
+		})
+	}
+};
+
+export default config;
+```
+
+----------------------------------------
+
+TITLE: Accessing Private Environment Variables in SvelteKit (TypeScript)
+DESCRIPTION: This snippet demonstrates how to import and use private runtime environment variables in a SvelteKit application. The `env` object from `$env/dynamic/private` provides access to variables defined by the platform, such as `process.env` in Node.js environments. These variables are not available on the client-side and are intended for server-side use.
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/kit/src/types/synthetic/$env+dynamic+private.md#_snippet_0
+
+LANGUAGE: TypeScript
+CODE:
+```
+import { env } from '$env/dynamic/private';
+console.log(env.DEPLOYMENT_SPECIFIC_VARIABLE);
+```
+
+----------------------------------------
+
+TITLE: Loading Page Data with `+page.js` in SvelteKit
+DESCRIPTION: This JavaScript `load` function, defined in `+page.js`, fetches data for a SvelteKit page. It runs on both the server and browser, returning a `post` object with dynamic title and content based on route parameters. The returned data is made available to the corresponding `+page.svelte` component via its `data` prop.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: src/routes/blog/[slug]/+page.js
+/** @type {import('./$types').PageLoad} */
+export function load({ params }) {
+	return {
+		post: {
+			title: `Title for ${params.slug} goes here`,
+			content: `Content for ${params.slug} goes here`
+		}
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Root Layout with Global Navigation Bar
+DESCRIPTION: Illustrates how to add a common navigation bar to the root `+layout.svelte` file, ensuring it appears on every page that uses this layout. The `@render children()` tag renders the content of the nested page below the navigation.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_6
+
+LANGUAGE: svelte
+CODE:
+```
+<script>
+	let { children } = $props();
+</script>
+
+<nav>
+	<a href="/">Home</a>
+	<a href="/about">About</a>
+	<a href="/settings">Settings</a>
+</nav>
+
+{@render children()}
+```
+
+----------------------------------------
+
+TITLE: Implementing Redirects with SvelteKit `redirect` Helper
+DESCRIPTION: This `+layout.server.js` snippet shows how to use the `redirect` helper from `@sveltejs/kit` to programmatically redirect users. If a user is not logged in (i.e., `locals.user` is undefined), it issues a 307 (Temporary Redirect) to the `/login` page.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_22
+
+LANGUAGE: js
+CODE:
+```
+// @filename: ambient.d.ts
+declare namespace App {
+	interface Locals {
+		user?: {
+			name: string;
+		}
+	}
+}
+
+// @filename: index.js
+// ---cut---
+import { redirect } from '@sveltejs/kit';
+
+/** @type {import('./$types').LayoutServerLoad} */
+export function load({ locals }) {
+	if (!locals.user) {
+		redirect(307, '/login');
+	}
+}
+```
+
+----------------------------------------
+
+TITLE: Consuming Merged Data in SvelteKit Page Component
+DESCRIPTION: This Svelte component (`/abc/+page.svelte`) demonstrates how to consume the data returned by the `load` functions. It uses `$props()` to access the `data` object, which contains the merged properties `a`, `b`, and `c` from the parent layouts and page `load` functions.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_19
+
+LANGUAGE: svelte
+CODE:
+```
+<script>
+	/** @type {import('./$types').PageProps} */
+	let { data } = $props();
+</script>
+
+<!-- renders `1 + 2 = 3` -->
+<p>{data.a} + {data.b} = {data.c}</p>
+```
+
+----------------------------------------
+
+TITLE: Returning Data from SvelteKit Load Function Correctly in JavaScript
+DESCRIPTION: This snippet provides the correct approach for handling data within a SvelteKit `load` function. Instead of causing side-effects by writing to a global store, the data fetched from `/api/user` is simply returned as part of the `load` function's result. This ensures purity and prevents data leakage, allowing components to access the data via `page.data`.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/50-state-management.md#_snippet_2
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: +page.js
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ fetch }) {
+	const response = await fetch('/api/user');
+
+	return {
+		user: await response.json()
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Defining Basic SvelteKit Pages with +page.svelte
+DESCRIPTION: Illustrates how to create simple SvelteKit pages using `+page.svelte` components for the root route and a basic `/about` route. These examples demonstrate fundamental HTML structure and navigation between pages.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_0
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/+page.svelte -->
+<h1>Hello and welcome to my site!</h1>
+<a href="/about">About my site</a>
+```
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/about/+page.svelte -->
+<h1>About this site</h1>
+<p>TODO...</p>
+<a href="/">Home</a>
+```
+
+----------------------------------------
+
+TITLE: Initializing a Svelte Project using npm
+DESCRIPTION: These commands initialize a new Svelte project. The first command creates a project in the current directory, while the second creates it in a specified subdirectory 'my-app'. This is the first step in setting up a SvelteKit application.
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/adapter-static/test/apps/spa/README.md#_snippet_0
+
+LANGUAGE: bash
+CODE:
+```
+# create a new project in the current directory
+npm init svelte
+```
+
+LANGUAGE: bash
+CODE:
+```
+# create a new project in my-app
+npm init svelte my-app
+```
+
+----------------------------------------
+
+TITLE: Creating a New SvelteKit Application with Yarn
+DESCRIPTION: This command sequence initializes a new SvelteKit project named 'myapp' using `yarn create svelte` and then navigates into the newly created project directory. This is the first step to set up a SvelteKit application.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/60-appendix/10-faq.md#_snippet_8
+
+LANGUAGE: sh
+CODE:
+```
+yarn create svelte myapp
+cd myapp
+```
+
+----------------------------------------
+
+TITLE: SvelteKit API Route GET Handler with +server.js
+DESCRIPTION: This JavaScript snippet demonstrates creating a `GET` handler in a `+server.js` file to define an API endpoint. It parses `min` and `max` query parameters, calculates a random number within the specified range, and returns it as a `Response` object, handling invalid input with SvelteKit's `error` utility.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_11
+
+LANGUAGE: javascript
+CODE:
+```
+/// file: src/routes/api/random-number/+server.js
+import { error } from '@sveltejs/kit';
+
+/** @type {import('./$types').RequestHandler} */
+export function GET({ url }) {
+	const min = Number(url.searchParams.get('min') ?? '0');
+	const max = Number(url.searchParams.get('max') ?? '1');
+
+	const d = max - min;
+
+	if (isNaN(d) || d < 0) {
+		error(400, 'min and max must be numbers, and min must be less than max');
+	}
+
+	const random = min + Math.random() * d;
+
+	return new Response(String(random));
+}
+```
+
+----------------------------------------
+
+TITLE: SvelteKit Page Submitting Data to API Endpoint
+DESCRIPTION: This Svelte component demonstrates how a client-side page can send data to a SvelteKit API endpoint using a `POST` request. It captures two numbers from input fields, sends them as JSON to `/api/add`, and displays the calculated sum received from the server.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/10-routing.md#_snippet_12
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/add/+page.svelte -->
+<script>
+	let a = 0;
+	let b = 0;
+	let total = 0;
+
+	async function add() {
+		const response = await fetch('/api/add', {
+			method: 'POST',
+			body: JSON.stringify({ a, b }),
+			headers: {
+				'content-type': 'application/json'
+			}
+		});
+
+		total = await response.json();
+	}
+</script>
+
+<input type="number" bind:value={a}> +
+<input type="number" bind:value={b}> =
+{total}
+
+<button onclick={add}>Calculate</button>
+```
+
+----------------------------------------
+
+TITLE: Implement Dynamic Imports for Selective Code Loading
+DESCRIPTION: Utilize the dynamic 'import(...)' syntax in JavaScript to selectively lazy-load components or modules only when a specific condition is met. This technique prevents unnecessary bundling of code that is not always required, thereby improving initial page load performance and reducing the overall bundle size.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/40-best-practices/05-performance.md#_snippet_1
+
+LANGUAGE: JavaScript
+CODE:
+```
+import(...)
+```
+
+----------------------------------------
+
+TITLE: Access Form Data and Display Messages in Svelte Page
+DESCRIPTION: This Svelte component demonstrates how to access the `form` property, which contains data returned by a server-side action. It shows how to conditionally display ephemeral messages (e.g., 'Successfully logged in!') based on the action's response.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/30-form-actions.md#_snippet_8
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/login/+page.svelte -->
+<script>
+	/** @type {import('./$types').PageProps} */
+	let { data, form } = $props();
+</script>
+
+{#if form?.success}
+	<!-- this message is ephemeral; it exists because the page was rendered in
+	       response to a form submission. it will vanish if the user reloads -->
+	<p>Successfully logged in! Welcome back, {data.user.name}</p>
+{/if}
+```
+
+----------------------------------------
+
+TITLE: Building a Svelte Project for Production
+DESCRIPTION: This command builds the Svelte application for production. An adapter must be installed beforehand to target the specific deployment environment. The built app can be previewed with `npm run preview` (not for production use).
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/adapter-static/test/apps/spa/README.md#_snippet_2
+
+LANGUAGE: bash
+CODE:
+```
+npm run build
+```
+
+----------------------------------------
+
+TITLE: Loading Server-Side Page Data with `+page.server.js`
+DESCRIPTION: This `load` function, defined in `+page.server.js`, is designed to run exclusively on the server. It demonstrates fetching blog post data from a server-side database using `db.getPost` and ensures type safety with `PageServerLoad`. This approach is suitable for operations requiring private environment variables or direct database access.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_3
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: src/routes/blog/[slug]/+page.server.js
+// @filename: ambient.d.ts
+declare module '$lib/server/database' {
+	export function getPost(slug: string): Promise<{ title: string, content: string }>
+}
+
+// @filename: index.js
+// ---cut---
+import * as db from '$lib/server/database';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ params }) {
+	return {
+		post: await db.getPost(params.slug)
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Handling Server Errors with Sentry in SvelteKit (JavaScript)
+DESCRIPTION: This JavaScript snippet demonstrates how to implement the `handleError` function in `src/hooks.server.js` for server-side error handling in SvelteKit. It generates a unique `errorId`, captures the exception using Sentry for logging and monitoring, and returns a user-friendly error message along with the `errorId` to the client, omitting sensitive details.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/20-hooks.md#_snippet_6
+
+LANGUAGE: JavaScript
+CODE:
+```
+import * as Sentry from '@sentry/sveltekit';
+
+Sentry.init({/*...*/})
+
+/** @type {import('@sveltejs/kit').HandleServerError} */
+export async function handleError({ error, event, status, message }) {
+	const errorId = crypto.randomUUID();
+
+	// example integration with https://sentry.io/
+	Sentry.captureException(error, {
+		extra: { event, errorId, status }
+	});
+
+	return {
+		message: 'Whoops!',
+		errorId
+	};
+}
+```
+
+----------------------------------------
+
+TITLE: Retrieving User Context in SvelteKit Page Component
+DESCRIPTION: This Svelte page component retrieves the user data previously set in the layout's context using `getContext`. It accesses the user object via the function passed into the context, allowing the component to display user-specific information. This pattern ensures state is passed down the component tree reactively.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/50-state-management.md#_snippet_4
+
+LANGUAGE: Svelte
+CODE:
+```
+<!--- file: src/routes/user/+page.svelte --->
+<script>
+	import { getContext } from 'svelte';
+
+	// Retrieve user store from context
+	const user = getContext('user');
+</script>
+
+<p>Welcome {user().name}</p>
+```
+
+----------------------------------------
+
+TITLE: Invoke Default Form Action from Svelte Page
+DESCRIPTION: This Svelte component shows a basic HTML `<form>` element. When submitted, it automatically targets the `default` action defined in the `+page.server.js` file for the current page, requiring no client-side JavaScript.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/30-form-actions.md#_snippet_1
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/login/+page.svelte -->
+<form method="POST">
+	<label>
+		Email
+		<input name="email" type="email">
+	</label>
+	<label>
+		Password
+		<input name="password" type="password">
+	</label>
+	<button>Log in</button>
+</form>
+```
+
+----------------------------------------
+
+TITLE: Creating Svelte Projects with `sv` (Deprecated `create-svelte`)
+DESCRIPTION: This command demonstrates how to create a new Svelte project using the `sv` package, which is the recommended alternative to the deprecated `create-svelte` package. It executes the `sv` command via `npx`.
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/create-svelte/README.md#_snippet_0
+
+LANGUAGE: Bash
+CODE:
+```
+npx sv create
+```
+
+----------------------------------------
+
+TITLE: Handling Streamed Promises in Svelte Component
+DESCRIPTION: This Svelte component demonstrates how to consume streamed promises from a `load` function using the `#await` block. It displays a loading state while `data.comments` is resolving, then renders the comments upon resolution, and provides error handling if the promise rejects. This enables skeleton loading states for asynchronously loaded data.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_24
+
+LANGUAGE: svelte
+CODE:
+```
+<!- file: src/routes/blog/[slug]/+page.svelte -->
+<script>
+	/** @type {import('./$types').PageProps} */
+	let { data } = $props();
+</script>
+
+<h1>{data.post.title}</h1>
+<div>{@html data.post.content}</div>
+
+{#await data.comments}
+	Loading comments...
+{:then comments}
+	{#each comments as comment}
+		<p>{comment.content}</p>
+	{/each}
+{:catch error}
+	<p>error loading comments: {error.message}</p>
+{/await}
+```
+
+----------------------------------------
+
+TITLE: Accessing Page Data in SvelteKit Layouts (Svelte)
+DESCRIPTION: This Svelte snippet demonstrates how a parent layout component can access data from a child page or layout using the `page.data` store. It imports `page` from `$app/state` and uses `page.data.title` to dynamically set the document title within the `<svelte:head>` section, allowing for titles based on child component data.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_8
+
+LANGUAGE: svelte
+CODE:
+```
+<--- file: src/routes/+layout.svelte --->
+<script>
+	import { page } from '$app/state';
+</script>
+
+<svelte:head>
+	<title>{page.data.title}</title>
+</svelte:head>
+```
+
+----------------------------------------
+
+TITLE: Accessing URL Query Parameters with URLSearchParams in SvelteKit
+DESCRIPTION: This snippet demonstrates how to access URL query parameters using `url.searchParams`, an instance of `URLSearchParams`, within a SvelteKit application. It shows how to retrieve a specific query parameter, 'foo', from the URL. The `url` global object is made available by SvelteKit for this purpose.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/10-getting-started/40-web-standards.md#_snippet_2
+
+LANGUAGE: JavaScript
+CODE:
+```
+// @filename: ambient.d.ts
+declare global {
+	const url: URL;
+}
+
+export {};
+
+// @filename: index.js
+// ---cut---
+const foo = url.searchParams.get('foo');
+```
+
+----------------------------------------
+
+TITLE: Handle Form Data and Respond in SvelteKit Action
+DESCRIPTION: This JavaScript code demonstrates the anatomy of a SvelteKit action. It shows how an action receives a `RequestEvent`, reads form data using `request.formData()`, performs server-side operations like setting cookies, and returns a response object (e.g., `{ success: true }`) to the client.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/30-form-actions.md#_snippet_7
+
+LANGUAGE: js
+CODE:
+```
+/// file: src/routes/login/+page.server.js
+// @filename: ambient.d.ts
+declare module '$lib/server/db';
+
+// @filename: index.js
+// ---cut---
+import * as db from '$lib/server/db';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ cookies }) {
+	const user = await db.getUserFromSession(cookies.get('sessionid'));
+	return { user };
+}
+
+/** @satisfies {import('./$types').Actions} */
+export const actions = {
+	login: async ({ cookies, request }) => {
+		const data = await request.formData();
+		const email = data.get('email');
+		const password = data.get('password');
+
+		const user = await db.getUser(email);
+		cookies.set('sessionid', await db.createSession(user), { path: '/' });
+
+		return { success: true };
+	},
+	register: async (event) => {
+		// TODO register the user
+	}
+};
+```
+
+----------------------------------------
+
+TITLE: Starting the Svelte Development Server
+DESCRIPTION: These commands start the development server for a Svelte project. `npm run dev` starts the server, and `npm run dev -- --open` additionally opens the application in a new browser tab. This is used for local development and testing.
+SOURCE: https://github.com/sveltejs/kit/blob/main/packages/adapter-static/test/apps/spa/README.md#_snippet_1
+
+LANGUAGE: bash
+CODE:
+```
+npm run dev
+```
+
+LANGUAGE: bash
+CODE:
+```
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+----------------------------------------
+
+TITLE: Customizing SvelteKit `use:enhance` Behavior
+DESCRIPTION: To customize the progressive enhancement behavior, `use:enhance` accepts a `SubmitFunction` callback. This function runs immediately before form submission, allowing access to form elements, data, and the ability to cancel submission. It can optionally return another callback to handle the `ActionResult` after submission, enabling custom UI updates like loading indicators.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/30-form-actions.md#_snippet_15
+
+LANGUAGE: Svelte
+CODE:
+```
+<form
+	method="POST"
+	use:enhance={({ formElement, formData, action, cancel, submitter }) => {
+		// `formElement` is this `<form>` element
+		// `formData` is its `FormData` object that's about to be submitted
+		// `action` is the URL to which the form is posted
+		// calling `cancel()` will prevent the submission
+		// `submitter` is the `HTMLElement` that caused the form to be submitted
+
+		return async ({ result, update }) => {
+			// `result` is an `ActionResult` object
+			// `update` is a function which triggers the default logic that would be triggered if this callback wasn't set
+		};
+	}}
+>
+
+```
+
+----------------------------------------
+
+TITLE: Conditionally Executing Server Code During SvelteKit Build - JavaScript
+DESCRIPTION: This snippet demonstrates how to use the `building` flag from `$app/environment` to prevent specific server-side code, such as database setup, from executing during the SvelteKit build process. This is crucial for code that should only run in the deployed environment, not during the build analysis phase. It ensures that operations like `setupMyDatabase()` are only performed when the application is actually running, not when it's being compiled.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/25-build-and-deploy/10-building-your-app.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+import { building } from '$app/environment';
+import { setupMyDatabase } from '$lib/server/database';
+
+if (!building) {
+	setupMyDatabase();
+}
+
+export function load() {
+	// ...
+}
+```
+
+----------------------------------------
+
+TITLE: SvelteKit Interacting with +server.js for JSON API
+DESCRIPTION: This example demonstrates an alternative to form actions by using `+server.js` files to expose a JSON API. The Svelte component makes a `POST` request to a `/api/ci` endpoint, which is handled by the corresponding `+server.js` file.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/30-form-actions.md#_snippet_19
+
+LANGUAGE: Svelte
+CODE:
+```
+<!- file: src/routes/send-message/+page.svelte -->
+<script>
+	function rerun() {
+		fetch('/api/ci', {
+			method: 'POST'
+		});
+	}
+</script>
+
+<button onclick={rerun}>Rerun CI</button>
+```
+
+LANGUAGE: JavaScript
+CODE:
+```
+// @errors: 2355 1360 2322
+/// file: src/routes/api/ci/+server.js
+/** @type {import('./$types').RequestHandler} */
+export function POST() {
+	// do something
+}
+```
+
+----------------------------------------
+
+TITLE: Handling Expected Errors in SvelteKit Page Server Load (JavaScript)
+DESCRIPTION: This snippet demonstrates how to use the `error` helper from `@sveltejs/kit` to handle expected errors within a `+page.server.js` `load` function. It checks if a post exists and, if not, throws a 404 error with a custom message, which SvelteKit then catches to render an `+error.svelte` component.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/25-errors.md#_snippet_0
+
+LANGUAGE: JavaScript
+CODE:
+```
+/// file: src/routes/blog/[slug]/+page.server.js
+// @filename: ambient.d.ts
+declare module '$lib/server/database' {
+	export function getPost(slug: string): Promise<{ title: string, content: string } | undefined>
+}
+
+// @filename: index.js
+// ---cut---
+import { error } from '@sveltejs/kit';
+import * as db from '$lib/server/database';
+
+/** @type {import('./$types').PageServerLoad} */
+export async function load({ params }) {
+	const post = await db.getPost(params.slug);
+
+	if (!post) {
+		error(404, {
+			message: 'Not found'
+		});
+	}
+
+	return { post };
+}
+```
+
+----------------------------------------
+
+TITLE: Handling Expected Errors with SvelteKit `error` Helper
+DESCRIPTION: This `+layout.server.js` snippet demonstrates using the `error` helper from `@sveltejs/kit` to throw expected HTTP errors. It checks user authentication and admin status, throwing 401 (Unauthorized) or 403 (Forbidden) errors respectively, which will render the nearest `+error.svelte`.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/20-core-concepts/20-load.md#_snippet_21
+
+LANGUAGE: js
+CODE:
+```
+// @filename: ambient.d.ts
+declare namespace App {
+	interface Locals {
+		user?: {
+			name: string;
+			isAdmin: boolean;
+		}
+	}
+}
+
+// @filename: index.js
+// ---cut---
+import { error } from '@sveltejs/kit';
+
+/** @type {import('./$types').LayoutServerLoad} */
+export function load({ locals }) {
+	if (!locals.user) {
+		error(401, 'not logged in');
+	}
+
+	if (!locals.user.isAdmin) {
+		error(403, 'not an admin');
+	}
+}
+```
+
+----------------------------------------
+
+TITLE: Displaying SvelteKit Error Message in Svelte Component
+DESCRIPTION: This Svelte component (`+error.svelte`) demonstrates how to access and display the error message provided by SvelteKit. It imports the `page` store from `$app/state` (or `$app/stores` for older versions) to dynamically render the `message` property of the error object.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/30-advanced/25-errors.md#_snippet_1
+
+LANGUAGE: Svelte
+CODE:
+```
+<script>
+	import { page } from '$app/state';
+</script>
+
+<h1>{page.error.message}</h1>
+```
+
+----------------------------------------
+
+TITLE: Processing FormData in SvelteKit Server Route (JavaScript)
+DESCRIPTION: This JavaScript example illustrates how to process FormData from an HTML native form submission within a SvelteKit +server.js POST handler. It shows how to asynchronously parse the request body into a FormData object using event.request.formData(), log all submitted fields, and retrieve the value of a specific field, such as 'name', providing a default if not present.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/10-getting-started/40-web-standards.md#_snippet_1
+
+LANGUAGE: JavaScript
+CODE:
+```
+// @errors: 2461
+/// file: src/routes/hello/+server.js
+import { json } from '@sveltejs/kit';
+
+/** @type {import('./$types').RequestHandler} */
+export async function POST(event) {
+	const body = await event.request.formData();
+
+	// log all fields
+	console.log([...body]);
+
+	return json({
+		// get a specific field's value
+		name: body.get('name') ?? 'world'
+	});
+}
+```
+
+----------------------------------------
+
+TITLE: Configuring SvelteKit Adapter in svelte.config.js (JavaScript)
+DESCRIPTION: This snippet defines the `svelte.config.js` file, which is crucial for SvelteKit projects. It imports the `@sveltejs/adapter-auto` and configures the `kit.adapter` property, allowing SvelteKit to automatically determine the best adapter for deployment. It also includes a TypeScript declaration for the adapter module to ensure proper type checking.
+SOURCE: https://github.com/sveltejs/kit/blob/main/documentation/docs/98-reference/50-configuration.md#_snippet_0
+
+LANGUAGE: js
+CODE:
+```
+/// file: svelte.config.js
+// @filename: ambient.d.ts
+declare module '@sveltejs/adapter-auto' {
+	const plugin: () => import('@sveltejs/kit').Adapter;
+	export default plugin;
+}
+
+// @filename: index.js
+// ---cut---
+import adapter from '@sveltejs/adapter-auto';
+
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+	kit: {
+		adapter: adapter()
+	}
+};
+
+export default config;
+```
