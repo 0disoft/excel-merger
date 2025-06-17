@@ -32,7 +32,7 @@
     padding-top: 30px; /* 타이틀바 높이 */
     display: flex;
     flex-direction: column;
-    height: 100vh; /* 화면 전체 높이 */
+    height: 90vh; /* 화면 전체 높이 */
     width: 100vw;
     background-color: #2a2a2a;
     color: #f0f0f0;
